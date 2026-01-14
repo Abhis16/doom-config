@@ -1,0 +1,9 @@
+# Local/generated files
+*.elc
+.local/
+custom.el
+
+# Secrets - NEVER commit these
+auth-source-pass/
+.authinfo*
+*-secret*.el
