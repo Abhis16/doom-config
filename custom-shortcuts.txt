@@ -28,5 +28,14 @@ Org mode (local leader in org buffers):
 - SPC m q: Set tags (fast-select with p/r/s).
 - SPC m A: Archive all DONE tasks to Completed section.
 
+Website workflow (SPC W - capital W):
+- SPC W w: Open website project.
+- SPC W n: New blog post (prompts for title, creates file with frontmatter).
+- SPC W e: Edit existing post (select from list).
+- SPC W p: Preview site (starts zola serve).
+- SPC W d: Deploy site (git add, commit, push).
+- SPC W b: Build site (zola build).
+- SPC W o: Open writings directory.
+
 Insert mode:
 - C-[: Exit insert mode to normal mode (evil-normal-state).

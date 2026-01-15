@@ -391,6 +391,76 @@
 ;; they are implemented.
 
 ;; ============================================================================
+;; ZOLA WEBSITE WORKFLOW
+;; ============================================================================
+
+(defvar my/website-dir "/Users/abhishukul/website/abhishukul/"
+  "Directory containing the Zola website project.")
+
+(defvar my/website-posts-dir "/Users/abhishukul/website/abhishukul/content/writings/"
+  "Directory for blog posts.")
+
+(defun my/website-open-project ()
+  "Open the website project in Doom."
+  (interactive)
+  (let ((default-directory my/website-dir))
+    (call-interactively #'find-file)))
+
+(defun my/website-new-post ()
+  "Create a new blog post with Zola frontmatter."
+  (interactive)
+  (let* ((title (read-string "Post title: "))
+         (slug (replace-regexp-in-string "[^a-z0-9]+" "-"
+                                         (downcase title)))
+         (filename (concat my/website-posts-dir slug ".md"))
+         (date (format-time-string "%Y-%m-%d")))
+    (find-file filename)
+    (insert (format "+++\ntitle = \"%s\"\ndate = %s\ndescription = \"\"\n+++\n\n"
+                    title date))
+    (goto-char (point-max))
+    (message "Created new post: %s" filename)))
+
+(defun my/website-preview ()
+  "Start Zola dev server to preview the site."
+  (interactive)
+  (let ((default-directory my/website-dir))
+    (async-shell-command "zola serve" "*Zola Preview*")))
+
+(defun my/website-deploy ()
+  "Deploy website: stage all changes, commit, and push."
+  (interactive)
+  (let ((default-directory my/website-dir)
+        (msg (read-string "Commit message: " "Update site")))
+    (shell-command (format "git add -A && git commit -m '%s' && git push" msg))
+    (message "Website deployed!")))
+
+(defun my/website-build ()
+  "Build the Zola site (generates public/ folder)."
+  (interactive)
+  (let ((default-directory my/website-dir))
+    (shell-command "zola build")
+    (message "Site built in %spublic/" my/website-dir)))
+
+(defun my/website-edit-post ()
+  "Open an existing blog post by selecting from available posts."
+  (interactive)
+  (let* ((files (directory-files my/website-posts-dir nil "\\.md$"))
+         (posts (cl-remove-if (lambda (f) (string-prefix-p "_" f)) files))
+         (choice (completing-read "Edit post: " posts nil t)))
+    (find-file (concat my/website-posts-dir choice))))
+
+;; Website keybindings under SPC W (capital W to avoid conflict with window commands)
+(map! :leader
+      (:prefix ("W" . "website")
+       :desc "Open project" "w" #'my/website-open-project
+       :desc "New blog post" "n" #'my/website-new-post
+       :desc "Edit blog post" "e" #'my/website-edit-post
+       :desc "Preview (zola serve)" "p" #'my/website-preview
+       :desc "Deploy (commit & push)" "d" #'my/website-deploy
+       :desc "Build site" "b" #'my/website-build
+       :desc "Open writings dir" "o" (cmd! (find-file my/website-posts-dir))))
+
+;; ============================================================================
 ;; PERFORMANCE / STABILITY CONFIGURATION
 ;; ============================================================================
 
