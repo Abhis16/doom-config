@@ -1,0 +1,353 @@
+# Implementation Plan: Deadline-Based Todo System for Doom Emacs
+
+## Overview
+
+Set up a simple, low-maintenance org-mode todo system for PhD student work with:
+- Single-file organization (todo.org) with tag-based filtering
+- Three category tags: `:personal:`, `:research:`, `:school:`
+- Mandatory deadlines on all tasks
+- Custom agenda views: top-5-per-category, complete lists per tag (uses default agenda for main view)
+- Three capture shortcuts (`t p`, `t r`, `t s`) with auto-applied tags and deadline prompts
+
+## Critical Files
+
+- `/Users/abhishukul/.config/doom/config.el` - All configuration changes
+- `/Users/abhishukul/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/org/todo.org` - File restructuring
+
+## Implementation Steps
+
+### 1. Configure Tags System
+
+**File:** `config.el` (after line 73, before capture templates)
+
+Add tag definitions with fast-selection keys:
+
+```elisp
+;; ============================================================================
+;; TODO SYSTEM: TAG CONFIGURATION
+;; ============================================================================
+
+;; Define three mutually exclusive tags for task categorization
+(after! org
+  (setq org-tag-alist
+        '((:startgroup)
+          ("personal" . ?p)
+          ("research" . ?r)
+          ("school" . ?s)
+          (:endgroup)))
+
+  ;; Prevent tag inheritance (each task must have its own tag)
+  (setq org-tags-exclude-from-inheritance '("personal" "research" "school"))
+
+  ;; Display tags prominently in agenda
+  (setq org-agenda-tags-column -100))
+```
+
+### 2. Create Deadline Enforcement Hook
+
+**File:** `config.el` (after line 85, before keybindings)
+
+Add a hook to ensure every captured todo gets a deadline:
+
+```elisp
+;; ============================================================================
+;; TODO SYSTEM: DEADLINE ENFORCEMENT
+;; ============================================================================
+
+(defun my/org-capture-ensure-deadline ()
+  "Ensure the captured task has a deadline. Prompt if missing."
+  (save-excursion
+    (org-back-to-heading t)
+    (unless (org-entry-get nil "DEADLINE")
+      (org-deadline nil))))
+
+(defun my/org-capture-todo-finalize ()
+  "Hook to ensure todos have deadlines."
+  (when (member (org-capture-get :key) '("tp" "tr" "ts"))
+    (my/org-capture-ensure-deadline)))
+
+(add-hook 'org-capture-before-finalize-hook #'my/org-capture-todo-finalize)
+```
+
+### 3. Update Capture Templates
+
+**File:** `config.el` (modify lines 78-85)
+
+Create three todo capture templates with auto-applied tags:
+
+```elisp
+(after! org
+  (setq org-capture-templates
+        '(("t" "Todo")
+          ("tp" "Personal Todo" entry (file+headline "todo.org" "Active Tasks")
+           "* TODO %? :personal:\n")
+          ("tr" "Research Todo" entry (file+headline "todo.org" "Active Tasks")
+           "* TODO %? :research:\n")
+          ("ts" "School/Admin Todo" entry (file+headline "todo.org" "Active Tasks")
+           "* TODO %? :school:\n")
+          ("n" "Note" entry (file+headline "notes.org" "Notes")
+           "* %?\n%U\n")
+          ("r" "Research Note" entry (file+headline "research/papers.org" "Reading Notes")
+           "* %?\n%U\n%a\n")
+          ("j" "Journal" entry (file+datetree "journal.org")
+           "* %?\n%U\n"))))
+```
+
+**Capture shortcuts:**
+- `SPC o c` then `t p` → Personal todo (auto-tagged `:personal:`)
+- `SPC o c` then `t r` → Research todo (auto-tagged `:research:`)
+- `SPC o c` then `t s` → School/admin todo (auto-tagged `:school:`)
+
+### 4. Add Custom Agenda Views
+
+**File:** `config.el` (after line 106, after local-leader keybindings)
+
+Create four custom agenda commands (uses default agenda for main view):
+
+```elisp
+;; ============================================================================
+;; TODO SYSTEM: CUSTOM AGENDA VIEWS
+;; ============================================================================
+
+(after! org-agenda
+  (setq org-agenda-custom-commands
+        '(("t" "Top 5 Per Category"
+           ((tags-todo "personal"
+                       ((org-agenda-overriding-header "🏠 Personal (Top 5)")
+                        (org-agenda-skip-function
+                         '(org-agenda-skip-entry-if 'notdeadline))
+                        (org-agenda-sorting-strategy '(deadline-up priority-down))
+                        (org-agenda-max-entries 5)))
+            (tags-todo "research"
+                       ((org-agenda-overriding-header "\n🔬 Research (Top 5)")
+                        (org-agenda-skip-function
+                         '(org-agenda-skip-entry-if 'notdeadline))
+                        (org-agenda-sorting-strategy '(deadline-up priority-down))
+                        (org-agenda-max-entries 5)))
+            (tags-todo "school"
+                       ((org-agenda-overriding-header "\n🎓 School/Admin (Top 5)")
+                        (org-agenda-skip-function
+                         '(org-agenda-skip-entry-if 'notdeadline))
+                        (org-agenda-sorting-strategy '(deadline-up priority-down))
+                        (org-agenda-max-entries 5))))
+           ((org-agenda-files (list (expand-file-name "todo.org" org-directory)))))
+
+          ("p" "All Personal Tasks"
+           tags-todo "personal"
+           ((org-agenda-overriding-header "🏠 All Personal Tasks")
+            (org-agenda-skip-function
+             '(org-agenda-skip-entry-if 'notdeadline))
+            (org-agenda-sorting-strategy '(deadline-up priority-down))
+            (org-agenda-prefix-format "  %-12:c %?-12t %s")
+            (org-agenda-files (list (expand-file-name "todo.org" org-directory)))))
+
+          ("r" "All Research Tasks"
+           tags-todo "research"
+           ((org-agenda-overriding-header "🔬 All Research Tasks")
+            (org-agenda-skip-function
+             '(org-agenda-skip-entry-if 'notdeadline))
+            (org-agenda-sorting-strategy '(deadline-up priority-down))
+            (org-agenda-prefix-format "  %-12:c %?-12t %s")
+            (org-agenda-files (list (expand-file-name "todo.org" org-directory)))))
+
+          ("s" "All School/Admin Tasks"
+           tags-todo "school"
+           ((org-agenda-overriding-header "🎓 All School/Admin Tasks")
+            (org-agenda-skip-function
+             '(org-agenda-skip-entry-if 'notdeadline))
+            (org-agenda-sorting-strategy '(deadline-up priority-down))
+            (org-agenda-prefix-format "  %-12:c %?-12t %s")
+            (org-agenda-files (list (expand-file-name "todo.org" org-directory)))))))
+
+  ;; Additional agenda settings for better display
+  (setq org-agenda-prefix-format
+        '((agenda . " %i %-12:c%?-12t% s")
+          (todo . " %i %-12:c")
+          (tags . " %i %-12:c")
+          (search . " %i %-12:c")))
+
+  ;; Show deadlines prominently
+  (setq org-agenda-deadline-faces
+        '((1.0 . org-warning)
+          (0.5 . org-upcoming-deadline)
+          (0.0 . org-upcoming-distant-deadline)))
+
+  ;; Cleaner deadline display
+  (setq org-agenda-deadline-leaders
+        '("Deadline:  " "Due in %2d: " "Overdue %2d: ")))
+```
+
+### 5. Add Archive Functionality
+
+**File:** `config.el` (after agenda views)
+
+Enable manual archiving of completed tasks:
+
+```elisp
+;; ============================================================================
+;; TODO SYSTEM: AUTO-ARCHIVE
+;; ============================================================================
+
+;; Move completed tasks to "Completed" section automatically
+(after! org
+  (setq org-archive-location (concat (expand-file-name "todo.org" org-directory) "::* Completed"))
+
+  ;; Function to archive all DONE tasks
+  (defun my/org-archive-done-tasks ()
+    "Archive all DONE tasks in the current buffer."
+    (interactive)
+    (org-map-entries
+     (lambda ()
+       (org-archive-subtree)
+       (setq org-map-continue-from (org-element-property :begin (org-element-at-point))))
+     "/DONE" 'file))
+
+  ;; Add keybinding to manually trigger archive
+  (map! :map org-mode-map
+        :localleader
+        :desc "Archive DONE tasks" "A" #'my/org-archive-done-tasks))
+```
+
+### 6. Enhance Keybindings
+
+**File:** `config.el` (replace lines 88-99)
+
+Add direct shortcuts for common agenda views:
+
+```elisp
+;; Enhanced org keybindings for todo system
+(map! :leader
+      (:prefix ("o" . "org")
+       :desc "Agenda" "a" #'org-agenda
+       :desc "Capture" "c" #'org-capture
+       :desc "Todo file" "t"
+       (cmd! (find-file (expand-file-name "todo.org" org-directory)))
+       :desc "Notes file" "n"
+       (cmd! (find-file (expand-file-name "notes.org" org-directory)))
+       :desc "Journal file" "j"
+       (cmd! (find-file (expand-file-name "journal.org" org-directory)))
+       :desc "Papers file" "p"
+       (cmd! (find-file (expand-file-name "research/papers.org" org-directory)))
+       ;; Quick access to custom agenda views
+       :desc "Top 5 per category" "5" (cmd! (org-agenda nil "t"))))
+```
+
+### 7. Restructure todo.org
+
+**File:** `todo.org` (manual reorganization)
+
+Replace current structure with simplified version:
+
+```org
+#+TITLE: Tasks
+#+STARTUP: overview
+
+* Active Tasks
+All active to-do items with deadlines go here. Use SPC o c to capture new tasks.
+
+* Completed
+Archived completed tasks (use SPC m A to move DONE tasks here).
+```
+
+**Migration steps:**
+1. Move items from "Inbox" to "Active Tasks"
+2. Add category tags to existing tasks (`:personal:`, `:research:`, or `:school:`)
+3. Add deadlines to existing tasks (use `SPC m d`)
+4. Rename "DONE items" section to "Completed"
+5. Move or delete "Projects" and "Someday/Maybe" sections
+
+### 8. Apply Configuration
+
+Run these commands after making all changes:
+
+```bash
+# Restart Emacs to load new config
+# In Emacs: SPC h r r (doom/reload)
+# OR: SPC q R (quit and restart)
+```
+
+Note: `doom sync` is not required for config.el changes, but restart is necessary.
+
+## User Workflow
+
+### Daily Usage
+
+**Capture a new task:**
+1. Press `SPC o c` then:
+   - `t p` for personal task
+   - `t r` for research task
+   - `t s` for school/admin task
+2. Type task description (e.g., "cs 500 hw 1")
+3. Press `C-c C-c`
+4. Select deadline date
+5. Done - task saved with tag and deadline
+
+**View deadlines:**
+- `SPC o a a` - Default agenda (week view with deadlines and warnings)
+
+**Check priorities:**
+- `SPC o a` then `t` - Top 5 per category
+- `SPC o 5` - Direct shortcut
+
+**View category lists:**
+- `SPC o a` then `p` - All personal tasks
+- `SPC o a` then `r` - All research tasks
+- `SPC o a` then `s` - All school tasks
+
+**Mark complete:**
+- In todo.org: `SPC m t` then select DONE
+- In agenda: press `t` then select DONE
+
+**Archive completed:**
+- Open todo.org (`SPC o t`)
+- Press `SPC m A` to archive all DONE tasks to "Completed" section
+
+## Verification Steps
+
+### Test 1: Tag Configuration
+1. Restart Emacs (`SPC h r r`)
+2. Open todo.org (`SPC o t`)
+3. Move to any heading, press `SPC m q` (set tags)
+4. Verify personal/research/school appear with fast keys (p/r/s)
+
+### Test 2: Capture Workflow
+1. Press `SPC o c` then `t p` (for personal task)
+2. Type "test task for deadline system"
+3. Press `C-c C-c`
+4. Verify deadline picker appears
+5. Select a date (e.g., tomorrow)
+6. Open todo.org and confirm task has `:personal:` tag and deadline
+7. Repeat with `t r` and `t s` to verify research and school templates work
+
+### Test 3: Agenda Views
+1. Press `SPC o a a` - verify default agenda shows deadlines
+2. Press `SPC o a` then `t` - verify shows three sections (Personal/Research/School top 5)
+3. Press `SPC o a` then `p` - verify shows only personal tasks sorted by deadline
+4. Repeat for `r` and `s`
+
+### Test 4: Complete Workflow
+1. Capture 3 test tasks (one per category, different deadlines)
+2. Verify all appear in agenda views correctly
+3. Mark one as DONE
+4. Run archive command (`SPC m A`)
+5. Verify moved to "Completed" section
+
+### Test 5: Beorg Sync
+1. Sync with Beorg on iOS
+2. Verify tasks appear with tags and deadlines
+3. Make a change in Beorg
+4. Sync back to Mac
+5. Verify change appears in Emacs
+
+## Notes
+
+**No additional packages required** - all functionality uses built-in org-mode features.
+
+**Beorg compatibility:** Tags and deadlines sync bidirectionally. Fast-selection capture is Emacs-only, but you can manually add tags in Beorg.
+
+**Future extensions:**
+- Add habit tracking later using org-habit module
+- Add priorities with `[#A]`, `[#B]`, `[#C]` for finer control
+- Use repeater intervals for recurring tasks (e.g., `DEADLINE: <2026-01-20 Mon +1w>`)
+
+**Maintenance:** Run `SPC m A` weekly to archive completed tasks and keep todo.org clean.

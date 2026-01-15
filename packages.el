@@ -59,3 +59,6 @@
 
 ;; Google Calendar sync
 (package! org-gcal)
+
+;; Modern org-mode styling
+(package! org-modern)

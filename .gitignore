@@ -7,3 +7,7 @@ custom.el
 auth-source-pass/
 .authinfo*
 *-secret*.el
+
+# AI assistant context files
+AGENTS.md
+CLAUDE.md

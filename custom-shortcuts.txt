@@ -1,0 +1,32 @@
+Custom shortcuts (Doom Emacs)
+
+Global (leader) shortcuts:
+- SPC o a: Open Org agenda dispatcher.
+- SPC o c: Open Org capture menu.
+- SPC o t: Open todo.org.
+- SPC o n: Open notes.org.
+- SPC o j: Open journal.org.
+- SPC o p: Open research/papers.org.
+- SPC o 5: Open top 5 per category view (quick access).
+
+Todo capture shortcuts (SPC o c then):
+- t p: Capture personal todo (auto-tagged :personal:).
+- t r: Capture research todo (auto-tagged :research:).
+- t s: Capture school/admin todo (auto-tagged :school:).
+
+Custom agenda views (SPC o a then):
+- a: Default agenda (week view with deadlines and scheduled items).
+- t: Top 5 per category (5 closest deadlines for each tag).
+- p: All personal tasks (sorted by deadline).
+- r: All research tasks (sorted by deadline).
+- s: All school/admin tasks (sorted by deadline).
+
+Org mode (local leader in org buffers):
+- SPC m s: Schedule a task (org-schedule).
+- SPC m d: Add a deadline (org-deadline).
+- SPC m t: Toggle TODO state (org-todo).
+- SPC m q: Set tags (fast-select with p/r/s).
+- SPC m A: Archive all DONE tasks to Completed section.
+
+Insert mode:
+- C-[: Exit insert mode to normal mode (evil-normal-state).

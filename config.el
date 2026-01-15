@@ -34,6 +34,26 @@
 ;; `load-theme' function. This is the default:
 (setq doom-theme 'doom-one)
 
+;; Set default frame (window) size - wider than tall
+(add-to-list 'default-frame-alist '(width . 170))   ; characters wide
+(add-to-list 'default-frame-alist '(height . 70))   ; lines tall
+
+;; Ensure proper font fallbacks to prevent rendering crashes
+(setq doom-symbol-font (font-spec :family "Symbols Nerd Font Mono"))
+
+;; ;; Disable modeline icons to prevent font rendering crashes
+;; (setq doom-modeline-icon nil)
+
+;; ;; Set up Unicode font fallbacks to prevent crashes on special characters
+;; (defun my/setup-font-fallbacks ()
+;;   "Set up font fallbacks for Unicode characters."
+;;   (set-fontset-font t 'unicode "Apple Color Emoji" nil 'prepend)
+;;   (set-fontset-font t 'unicode "Symbols Nerd Font Mono" nil 'append)
+;;   (set-fontset-font t 'unicode "Apple Symbols" nil 'append)
+;;   (set-fontset-font t 'unicode "Symbol" nil 'append))
+
+;; (add-hook 'after-init-hook #'my/setup-font-fallbacks)
+
 ;; This determines the style of line numbers in effect. If set to `nil', line
 ;; numbers are disabled. For relative line numbers, set this to `relative'.
 (setq display-line-numbers-type t)
@@ -52,11 +72,53 @@
 (setq org-todo-keywords
       '((sequence "TODO(t)" "IN-PROGRESS(i)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)")))
 
+;; ============================================================================
+;; TODO SYSTEM: TAG CONFIGURATION
+;; ============================================================================
+
+;; Define three mutually exclusive tags for task categorization
+(after! org
+  (setq org-tag-alist
+        '((:startgroup)
+          ("personal" . ?p)
+          ("research" . ?r)
+          ("school" . ?s)
+          (:endgroup)))
+
+  ;; Prevent tag inheritance (each task must have its own tag)
+  (setq org-tags-exclude-from-inheritance '("personal" "research" "school"))
+
+  ;; Display tags prominently in agenda
+  (setq org-agenda-tags-column -100))
+
+;; ============================================================================
+;; TODO SYSTEM: DEADLINE ENFORCEMENT
+;; ============================================================================
+
+(defun my/org-capture-ensure-deadline ()
+  "Ensure the captured task has a deadline. Prompt if missing."
+  (save-excursion
+    (org-back-to-heading t)
+    (unless (org-entry-get nil "DEADLINE")
+      (org-deadline nil))))
+
+(defun my/org-capture-todo-finalize ()
+  "Hook to ensure todos have deadlines."
+  (when (member (org-capture-get :key) '("tp" "tr" "ts"))
+    (my/org-capture-ensure-deadline)))
+
+(add-hook 'org-capture-before-finalize-hook #'my/org-capture-todo-finalize)
+
 ;; Capture templates for quick note/todo entry
 (after! org
   (setq org-capture-templates
-        '(("t" "Todo" entry (file+headline "todo.org" "Inbox")
-           "* TODO %?\n%U\n")
+        '(("t" "Todo")
+          ("tp" "Personal Todo" entry (file+headline "todo.org" "Active Tasks")
+           "* TODO %? :personal:\n")
+          ("tr" "Research Todo" entry (file+headline "todo.org" "Active Tasks")
+           "* TODO %? :research:\n")
+          ("ts" "School/Admin Todo" entry (file+headline "todo.org" "Active Tasks")
+           "* TODO %? :school:\n")
           ("n" "Note" entry (file+headline "notes.org" "Notes")
            "* %?\n%U\n")
           ("r" "Research Note" entry (file+headline "research/papers.org" "Reading Notes")
@@ -64,8 +126,141 @@
           ("j" "Journal" entry (file+datetree "journal.org")
            "* %?\n%U\n"))))
 
+;; Quick org navigation and capture shortcuts.
+;; Note: SPC o a is handled by Doom's defaults (opens agenda dispatcher)
+(map! :leader
+      (:prefix ("o" . "org")
+       :desc "Capture" "c" #'org-capture
+       :desc "Todo file" "t"
+       (cmd! (find-file (expand-file-name "todo.org" org-directory)))
+       :desc "Notes file" "n"
+       (cmd! (find-file (expand-file-name "notes.org" org-directory)))
+       :desc "Journal file" "j"
+       (cmd! (find-file (expand-file-name "journal.org" org-directory)))
+       :desc "Papers file" "p"
+       (cmd! (find-file (expand-file-name "research/papers.org" org-directory)))
+       ;; Quick access to custom agenda views
+       :desc "Top 5 per category" "5" (cmd! (org-agenda nil "t"))))
+
+;; Ensure org local-leader keys for scheduling and todo toggles are consistent.
+(map! :map org-mode-map
+      :localleader
+      :desc "Schedule" "s" #'org-schedule
+      :desc "Deadline" "d" #'org-deadline
+      :desc "Todo state" "t" #'org-todo)
+
+;; ============================================================================
+;; TODO SYSTEM: CUSTOM AGENDA VIEWS
+;; ============================================================================
+
+(after! org-agenda
+  (setq org-agenda-custom-commands
+        '(("t" "Top 5 Per Category"
+           ((tags-todo "personal"
+                       ((org-agenda-overriding-header "Personal (Top 5)")
+                        (org-agenda-skip-function
+                         '(org-agenda-skip-entry-if 'notdeadline))
+                        (org-agenda-sorting-strategy '(deadline-up priority-down))
+                        (org-agenda-max-entries 5)))
+            (tags-todo "research"
+                       ((org-agenda-overriding-header "\nResearch (Top 5)")
+                        (org-agenda-skip-function
+                         '(org-agenda-skip-entry-if 'notdeadline))
+                        (org-agenda-sorting-strategy '(deadline-up priority-down))
+                        (org-agenda-max-entries 5)))
+            (tags-todo "school"
+                       ((org-agenda-overriding-header "\nSchool/Admin (Top 5)")
+                        (org-agenda-skip-function
+                         '(org-agenda-skip-entry-if 'notdeadline))
+                        (org-agenda-sorting-strategy '(deadline-up priority-down))
+                        (org-agenda-max-entries 5))))
+           ((org-agenda-files (list (expand-file-name "todo.org" org-directory)))))
+
+          ("p" "All Personal Tasks"
+           tags-todo "personal"
+           ((org-agenda-overriding-header "All Personal Tasks")
+            (org-agenda-skip-function
+             '(org-agenda-skip-entry-if 'notdeadline))
+            (org-agenda-sorting-strategy '(deadline-up priority-down))
+            (org-agenda-prefix-format "  %-12:c %?-12t %s")
+            (org-agenda-files (list (expand-file-name "todo.org" org-directory)))))
+
+          ("r" "All Research Tasks"
+           tags-todo "research"
+           ((org-agenda-overriding-header "All Research Tasks")
+            (org-agenda-skip-function
+             '(org-agenda-skip-entry-if 'notdeadline))
+            (org-agenda-sorting-strategy '(deadline-up priority-down))
+            (org-agenda-prefix-format "  %-12:c %?-12t %s")
+            (org-agenda-files (list (expand-file-name "todo.org" org-directory)))))
+
+          ("s" "All School/Admin Tasks"
+           tags-todo "school"
+           ((org-agenda-overriding-header "All School/Admin Tasks")
+            (org-agenda-skip-function
+             '(org-agenda-skip-entry-if 'notdeadline))
+            (org-agenda-sorting-strategy '(deadline-up priority-down))
+            (org-agenda-prefix-format "  %-12:c %?-12t %s")
+            (org-agenda-files (list (expand-file-name "todo.org" org-directory)))))))
+
+  ;; Additional agenda settings for better display
+  (setq org-agenda-prefix-format
+        '((agenda . " %i %-12:c%?-12t% s")
+          (todo . " %i %-12:c")
+          (tags . " %i %-12:c")
+          (search . " %i %-12:c")))
+
+  ;; Show deadlines prominently
+  (setq org-agenda-deadline-faces
+        '((1.0 . org-warning)
+          (0.5 . org-upcoming-deadline)
+          (0.0 . org-upcoming-distant-deadline)))
+
+  ;; Cleaner deadline display
+  (setq org-agenda-deadline-leaders
+        '("Deadline:  " "Due in %2d: " "Overdue %2d: ")))
+
+;; ============================================================================
+;; TODO SYSTEM: ARCHIVE FUNCTIONALITY
+;; ============================================================================
+
+;; Move completed tasks to "Completed" section
+(after! org
+  (setq org-archive-location (concat (expand-file-name "todo.org" org-directory) "::* Completed"))
+
+  ;; Function to archive all DONE tasks
+  (defun my/org-archive-done-tasks ()
+    "Archive all DONE tasks in the current buffer."
+    (interactive)
+    (org-map-entries
+     (lambda ()
+       (org-archive-subtree)
+       (setq org-map-continue-from (org-element-property :begin (org-element-at-point))))
+     "/DONE" 'file))
+
+  ;; Add keybinding to manually trigger archive
+  (map! :map org-mode-map
+        :localleader
+        :desc "Archive DONE tasks" "A" #'my/org-archive-done-tasks))
+
 ;; Org-roam configuration
 (setq org-roam-directory (concat org-directory "roam/"))
+
+;; ============================================================================
+;; ORG-MODERN: PRETTIER ORG-MODE UI
+;; ============================================================================
+
+(use-package! org-modern
+  :hook ((org-mode . org-modern-mode)
+         (org-agenda-mode . org-modern-agenda))
+  :config
+  ;; Customize org-modern appearance
+  (setq org-modern-star '("◉" "○" "◈" "◇" "✦")
+        org-modern-list '((?- . "•") (?+ . "◦") (?* . "‣"))
+        org-modern-tag t
+        org-modern-priority t
+        org-modern-todo t
+        org-modern-table t))
 
 ;; ============================================================================
 ;; LATEX CONFIGURATION
@@ -74,12 +269,15 @@
 ;; Use pdf-tools for viewing
 (setq +latex-viewers '(pdf-tools))
 
-;; Auto-revert PDF on recompile
-(after! latex
-  (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer))
+;; Set master file to the current file by default (avoids nil errors)
+(setq-default TeX-master t)
 
 ;; Default to latexmk
 (setq TeX-command-default "LatexMk")
+
+;; Auto-revert PDF on recompile
+(after! latex
+  (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer))
 
 ;; ============================================================================
 ;; CITAR (ZOTERO) CONFIGURATION
@@ -95,6 +293,54 @@
 (setq org-cite-insert-processor 'citar
       org-cite-follow-processor 'citar
       org-cite-activate-processor 'citar)
+
+;; ============================================================================
+;; CUSTOM DASHBOARD BANNER
+;; ============================================================================
+
+;; Use ASCII banner instead of image
+(setq fancy-splash-image nil)
+
+;; Add padding below the banner (top . bottom)
+(setq +doom-dashboard-banner-padding '(0 . 8))
+
+;; Custom banner color - cyan/blue gradient look
+(custom-set-faces!
+  '(doom-dashboard-banner :foreground "#51afef" :weight bold))
+
+(defun my/doom-dashboard-ascii-banner ()
+  (let* ((banner '(" /$$      /$$           /$$"
+                   "| $$  /$ | $$          | $$"
+                   "| $$ /$$$| $$  /$$$$$$ | $$  /$$$$$$$  /$$$$$$  /$$$$$$/$$$$   /$$$$$$"
+                   "| $$/$$ $$ $$ /$$__  $$| $$ /$$_____/ /$$__  $$| $$_  $$_  $$ /$$__  $$"
+                   "| $$$$_  $$$$| $$$$$$$$| $$| $$      | $$  \\ $$| $$ \\ $$ \\ $$| $$$$$$$$"
+                   "| $$$/ \\  $$$| $$_____/| $$| $$      | $$  | $$| $$ | $$ | $$| $$_____/"
+                   "| $$/   \\  $$|  $$$$$$$| $$|  $$$$$$$|  $$$$$$/| $$ | $$ | $$|  $$$$$$$ /$$"
+                   "|__/     \\__/ \\_______/|__/ \\_______/ \\______/ |__/ |__/ |__/ \\_______/| $/"
+                   "                                                                       |_/"
+                   ""
+                   "  /$$$$$$  /$$       /$$       /$$"
+                   " /$$__  $$| $$      | $$      |__/"
+                   "| $$  \\ $$| $$$$$$$ | $$$$$$$  /$$"
+                   "| $$$$$$$$| $$__  $$| $$__  $$| $$"
+                   "| $$__  $$| $$  \\ $$| $$  \\ $$| $$"
+                   "| $$  | $$| $$  | $$| $$  | $$| $$"
+                   "| $$  | $$| $$$$$$$/| $$  | $$| $$"
+                   "|__/  |__/|_______/ |__/  |__/|__/"))
+         (longest-line (apply #'max (mapcar #'length banner))))
+    (put-text-property
+     (point)
+     (dolist (line banner (point))
+       (insert (+doom-dashboard--center
+                +doom-dashboard--width
+                (concat line (make-string (max 0 (- longest-line (length line))) 32)))
+               "\n"))
+     'face 'doom-dashboard-banner)
+    ;; Add padding below the banner
+    (insert (make-string (or (cdr +doom-dashboard-banner-padding) 4) ?\n))))
+
+(setq +doom-dashboard-ascii-banner-fn #'my/doom-dashboard-ascii-banner)
+
 
 ;; ============================================================================
 ;; GOOGLE CALENDAR SYNC (Optional - configure when ready)
@@ -143,3 +389,21 @@
 ;;
 ;; You can also try 'gd' (or 'C-c c d') to jump to their definition and see how
 ;; they are implemented.
+
+;; ============================================================================
+;; PERFORMANCE / STABILITY CONFIGURATION
+;; ============================================================================
+
+;; LSP performance tuning to reduce memory pressure and prevent crashes
+(after! lsp-mode
+  (setq lsp-idle-delay 0.5                       ; Delay before LSP refresh
+        lsp-log-io nil                           ; Disable IO logging (saves memory)
+        gc-cons-threshold (* 100 1024 1024)      ; 100MB GC threshold
+        read-process-output-max (* 1024 1024)))  ; 1MB process read buffer
+
+;; Easier exit from insert mode without interfering with typing.
+(map! :i "C-[" #'evil-normal-state)
+
+;; If crashes persist, uncomment these lines to disable problematic features:
+;; (setq doom-modeline-icon nil)  ; Disable modeline icons
+;; (after! pdf-tools (pdf-tools-install :no-query))  ; Force reinstall pdf-tools
