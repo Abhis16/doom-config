@@ -60,5 +60,5 @@
 ;; Google Calendar sync
 (package! org-gcal)
 
-;; Modern org-mode styling
-(package! org-modern)
+;; Modern org-mode styling (disabled due to font rendering crashes)
+(package! org-modern :disable t)

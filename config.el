@@ -41,18 +41,18 @@
 ;; Ensure proper font fallbacks to prevent rendering crashes
 (setq doom-symbol-font (font-spec :family "Symbols Nerd Font Mono"))
 
-;; ;; Disable modeline icons to prevent font rendering crashes
-;; (setq doom-modeline-icon nil)
+;; Disable modeline icons to prevent font rendering crashes
+(setq doom-modeline-icon nil)
 
-;; ;; Set up Unicode font fallbacks to prevent crashes on special characters
-;; (defun my/setup-font-fallbacks ()
-;;   "Set up font fallbacks for Unicode characters."
-;;   (set-fontset-font t 'unicode "Apple Color Emoji" nil 'prepend)
-;;   (set-fontset-font t 'unicode "Symbols Nerd Font Mono" nil 'append)
-;;   (set-fontset-font t 'unicode "Apple Symbols" nil 'append)
-;;   (set-fontset-font t 'unicode "Symbol" nil 'append))
+;; Set up Unicode font fallbacks to prevent crashes on special characters
+(defun my/setup-font-fallbacks ()
+  "Set up font fallbacks for Unicode characters."
+  (set-fontset-font t 'unicode "Apple Color Emoji" nil 'prepend)
+  (set-fontset-font t 'unicode "Symbols Nerd Font Mono" nil 'append)
+  (set-fontset-font t 'unicode "Apple Symbols" nil 'append)
+  (set-fontset-font t 'unicode "Symbol" nil 'append))
 
-;; (add-hook 'after-init-hook #'my/setup-font-fallbacks)
+(add-hook 'after-init-hook #'my/setup-font-fallbacks)
 
 ;; This determines the style of line numbers in effect. If set to `nil', line
 ;; numbers are disabled. For relative line numbers, set this to `relative'.
@@ -62,8 +62,8 @@
 ;; ORG-MODE CONFIGURATION
 ;; ============================================================================
 
-;; Set org directory to iCloud for Beorg sync
-(setq org-directory "~/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/org/")
+;; Set org directory to local folder (moved from iCloud due to file locking issues)
+(setq org-directory "~/org/")
 
 ;; Agenda files
 (setq org-agenda-files (list org-directory))
@@ -243,24 +243,24 @@
         :localleader
         :desc "Archive DONE tasks" "A" #'my/org-archive-done-tasks))
 
-;; Org-roam configuration
-(setq org-roam-directory (concat org-directory "roam/"))
+;; Org-roam configuration (disabled for debugging)
+;; (setq org-roam-directory (concat org-directory "roam/"))
 
 ;; ============================================================================
 ;; ORG-MODERN: PRETTIER ORG-MODE UI
 ;; ============================================================================
 
-(use-package! org-modern
-  :hook ((org-mode . org-modern-mode)
-         (org-agenda-mode . org-modern-agenda))
-  :config
-  ;; Customize org-modern appearance
-  (setq org-modern-star '("◉" "○" "◈" "◇" "✦")
-        org-modern-list '((?- . "•") (?+ . "◦") (?* . "‣"))
-        org-modern-tag t
-        org-modern-priority t
-        org-modern-todo t
-        org-modern-table t))
+;; org-modern disabled entirely due to persistent font rendering crashes on macOS
+;; (use-package! org-modern
+;;   :hook ((org-mode . org-modern-mode)
+;;          (org-agenda-mode . org-modern-agenda))
+;;   :config
+;;   (setq org-modern-star nil
+;;         org-modern-list nil
+;;         org-modern-tag t
+;;         org-modern-priority t
+;;         org-modern-todo t
+;;         org-modern-table t))
 
 ;; ============================================================================
 ;; LATEX CONFIGURATION
@@ -285,9 +285,9 @@
 
 (use-package! citar
   :custom
-  (citar-bibliography '("~/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/org/references.bib"))
+  (citar-bibliography '("~/org/references.bib"))
   (citar-library-paths '("~/Zotero/storage/"))
-  (citar-notes-paths '("~/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/org/research/")))
+  (citar-notes-paths '("~/org/research/")))
 
 ;; Use citar with org-cite
 (setq org-cite-insert-processor 'citar
@@ -341,6 +341,68 @@
 
 (setq +doom-dashboard-ascii-banner-fn #'my/doom-dashboard-ascii-banner)
 
+;; Add custom footer with website link next to Doom logo
+(defun my/doom-dashboard-widget-footer ()
+  "Insert footer with Doom link and personal website link."
+  (insert "\n")
+  (insert (+doom-dashboard--center
+           +doom-dashboard--width
+           (with-temp-buffer
+             ;; Doom Emacs link (green text)
+             (insert-text-button
+              (propertize "Doom" 'face '(:foreground "#98be65" :weight bold))
+              'action (lambda (_) (browse-url "https://github.com/doomemacs/doomemacs"))
+              'help-echo "Doom Emacs GitHub"
+              'follow-link t)
+             (insert "  |  ")
+             ;; Personal website link
+             (insert-text-button
+              (propertize "abhishukul.com" 'face '(:foreground "#51afef" :underline t))
+              'action (lambda (_) (browse-url "https://abhishukul.com"))
+              'help-echo "Personal Website"
+              'follow-link t)
+             (buffer-string)))
+          "\n"))
+
+;; Replace the default footer with custom one
+(setq +doom-dashboard-functions
+      '(doom-dashboard-widget-banner
+        doom-dashboard-widget-shortmenu
+        doom-dashboard-widget-loaded
+        my/doom-dashboard-widget-footer))
+
+;; ============================================================================
+;; HABIT TRACKING SYSTEM
+;; ============================================================================
+
+;; Load the custom habit tracking module
+(load! "habits")
+
+;; Habit tracking keybindings under SPC o h
+(map! :leader
+      (:prefix ("o" . "org")
+       (:prefix ("h" . "habits")
+        :desc "Habit review" "h" #'my/habit-agenda-view
+        :desc "Open habits.org" "f" #'my/habit-open-file
+        :desc "Finalize day" "d" #'my/habit-finalize-day
+        :desc "Finalize week" "w" #'my/habit-finalize-week
+        :desc "Cancel habit range" "c" #'my/habit-cancel-range
+        :desc "Uncancel range" "u" #'my/habit-uncancel-range
+        :desc "View cancellations" "v" #'my/habit-view-cancellations
+        :desc "View logs" "l" #'my/habit-view-logs)))
+
+;; ============================================================================
+;; UNIFIED DASHBOARD
+;; ============================================================================
+
+;; Load the dashboard module (combines agenda, habits, and todos)
+(load! "dashboard")
+
+;; Dashboard keybinding under SPC o a
+(map! :leader
+      (:prefix ("o" . "org")
+       (:prefix ("a" . "agenda")
+        :desc "Unified dashboard" "a" #'my/dashboard-open)))
 
 ;; ============================================================================
 ;; GOOGLE CALENDAR SYNC (Optional - configure when ready)
@@ -459,6 +521,19 @@
        :desc "Deploy (commit & push)" "d" #'my/website-deploy
        :desc "Build site" "b" #'my/website-build
        :desc "Open writings dir" "o" (cmd! (find-file my/website-posts-dir))))
+
+;; ============================================================================
+;; BUFFER BEHAVIOR
+;; ============================================================================
+
+;; Always fall back to dashboard instead of *scratch*
+(setq doom-fallback-buffer-name +doom-dashboard-name)
+
+;; After killing a buffer, show dashboard if no other buffers
+(defadvice! my/switch-to-dashboard-on-kill (&rest _)
+  :after #'kill-current-buffer
+  (when (string= (buffer-name) "*scratch*")
+    (+doom-dashboard/open (selected-frame))))
 
 ;; ============================================================================
 ;; PERFORMANCE / STABILITY CONFIGURATION

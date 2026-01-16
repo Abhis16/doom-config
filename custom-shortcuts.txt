@@ -28,6 +28,24 @@ Org mode (local leader in org buffers):
 - SPC m q: Set tags (fast-select with p/r/s).
 - SPC m A: Archive all DONE tasks to Completed section.
 
+Habit tracking (SPC o h):
+- SPC o h h: Open habit review view (main interface).
+- SPC o h f: Open habits.org (edit habit definitions).
+- SPC o h d: Finalize today's habits (manual, before midnight).
+- SPC o h w: Finalize this week's habits (manual, before Sunday midnight).
+- SPC o h c: Cancel habit for date range.
+- SPC o h u: Uncancel habit range.
+- SPC o h v: View all cancellation ranges.
+- SPC o h l: View recent habit logs.
+
+In habit review buffer:
+- RET or SPC: Cycle habit state (incomplete -> completed -> cancelled).
+- c: Mark habit as completed.
+- i: Mark habit as incomplete.
+- x: Mark habit as cancelled.
+- g: Refresh the view.
+- q: Quit habit review.
+
 Website workflow (SPC W - capital W):
 - SPC W w: Open website project.
 - SPC W n: New blog post (prompts for title, creates file with frontmatter).
