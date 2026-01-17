@@ -384,6 +384,7 @@
 (setq +doom-dashboard-functions
       '(doom-dashboard-widget-banner
         doom-dashboard-widget-shortmenu
+        my/doom-dashboard-widget-quote
         doom-dashboard-widget-loaded
         my/doom-dashboard-widget-footer))
 
@@ -396,6 +397,9 @@
 
 ;; Load the weekly journal system
 (load! "journal")
+
+;; Load quote of the day module
+(load! "quotes")
 
 ;; Habit tracking keybindings under SPC o h
 (map! :leader
