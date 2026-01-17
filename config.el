@@ -65,8 +65,11 @@
 ;; Set org directory to local folder (moved from iCloud due to file locking issues)
 (setq org-directory "~/org/")
 
-;; Agenda files
-(setq org-agenda-files (list org-directory))
+;; Agenda files - explicitly list files instead of scanning directory
+;; (scanning causes hangs on every org file save)
+(setq org-agenda-files
+      (list (expand-file-name "todo.org" org-directory)
+            (expand-file-name "habits.org" org-directory)))
 
 ;; Todo keywords
 (setq org-todo-keywords
@@ -135,8 +138,12 @@
        (cmd! (find-file (expand-file-name "todo.org" org-directory)))
        :desc "Notes file" "n"
        (cmd! (find-file (expand-file-name "notes.org" org-directory)))
-       :desc "Journal file" "j"
-       (cmd! (find-file (expand-file-name "journal.org" org-directory)))
+       (:prefix ("j" . "journal")
+        :desc "New entry" "j" #'my/journal-new-entry
+        :desc "New entry" "n" #'my/journal-new-entry
+        :desc "Current week" "c" #'my/journal-open-current-week
+        :desc "Read week" "r" #'my/journal-read-week
+        :desc "List weeks" "l" #'my/journal-list-weeks)
        :desc "Papers file" "p"
        (cmd! (find-file (expand-file-name "research/papers.org" org-directory)))
        ;; Quick access to custom agenda views
@@ -266,18 +273,27 @@
 ;; LATEX CONFIGURATION
 ;; ============================================================================
 
-;; Use pdf-tools for viewing
-(setq +latex-viewers '(pdf-tools))
+;; Use Skim for PDF viewing (has SyncTeX support)
+(setq +latex-viewers '(skim))
 
 ;; Set master file to the current file by default (avoids nil errors)
 (setq-default TeX-master t)
 
-;; Default to latexmk
-(setq TeX-command-default "LatexMk")
-
-;; Auto-revert PDF on recompile
 (after! latex
-  (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer))
+  ;; Default to latexmk
+  (setq TeX-command-default "LatexMk")
+
+  ;; Auto-compile on save (runs latexmk directly)
+  (add-hook 'LaTeX-mode-hook
+            (lambda ()
+              (add-hook 'after-save-hook
+                        (lambda ()
+                          (let ((master (TeX-master-file)))
+                            (when master
+                              (save-window-excursion
+                                (compile (format "latexmk -pdf -synctex=1 %s"
+                                                (shell-quote-argument master)))))))
+                        nil t))))
 
 ;; ============================================================================
 ;; CITAR (ZOTERO) CONFIGURATION
@@ -377,6 +393,9 @@
 
 ;; Load the custom habit tracking module
 (load! "habits")
+
+;; Load the weekly journal system
+(load! "journal")
 
 ;; Habit tracking keybindings under SPC o h
 (map! :leader
@@ -545,6 +564,25 @@
         lsp-log-io nil                           ; Disable IO logging (saves memory)
         gc-cons-threshold (* 100 1024 1024)      ; 100MB GC threshold
         read-process-output-max (* 1024 1024)))  ; 1MB process read buffer
+
+;; Org-mode performance tuning to prevent hangs
+(after! org
+  ;; Disable org-element cache (can cause hangs on re-parse)
+  (setq org-element-use-cache nil)
+  ;; Reduce fontification overhead
+  (setq org-fontify-whole-heading-line nil
+        org-fontify-done-headline nil
+        org-fontify-quote-and-verse-blocks nil)
+  ;; Disable auto-align tags (expensive on large files)
+  (setq org-auto-align-tags nil)
+  ;; Disable invisible edits check (can cause pauses)
+  (setq org-catch-invisible-edits nil))
+
+;; Soft wrap for org files at readable width
+(add-hook 'org-mode-hook #'visual-line-mode)
+(add-hook 'org-mode-hook #'visual-fill-column-mode)
+(setq-default visual-fill-column-width 80
+              visual-fill-column-center-text nil)
 
 ;; Easier exit from insert mode without interfering with typing.
 (map! :i "C-[" #'evil-normal-state)

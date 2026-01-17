@@ -62,3 +62,6 @@
 
 ;; Modern org-mode styling (disabled due to font rendering crashes)
 (package! org-modern :disable t)
+
+;; Soft wrap at fill-column width
+(package! visual-fill-column)

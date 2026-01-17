@@ -5,7 +5,7 @@ Global (leader) shortcuts:
 - SPC o c: Open Org capture menu.
 - SPC o t: Open todo.org.
 - SPC o n: Open notes.org.
-- SPC o j: Open journal.org.
+- SPC o j: Journal prefix (see Journal section below).
 - SPC o p: Open research/papers.org.
 - SPC o 5: Open top 5 per category view (quick access).
 
@@ -46,6 +46,13 @@ In habit review buffer:
 - g: Refresh the view.
 - q: Quit habit review.
 
+Journal (SPC o j):
+- SPC o j j: New journal entry (add timestamped entry for today).
+- SPC o j n: New journal entry (alias for j j).
+- SPC o j c: Open current week's journal file.
+- SPC o j r: Read any week's journal (date picker).
+- SPC o j l: List all journal weeks (selection menu).
+
 Website workflow (SPC W - capital W):
 - SPC W w: Open website project.
 - SPC W n: New blog post (prompts for title, creates file with frontmatter).
@@ -54,6 +61,13 @@ Website workflow (SPC W - capital W):
 - SPC W d: Deploy site (git add, commit, push).
 - SPC W b: Build site (zola build).
 - SPC W o: Open writings directory.
+
+LaTeX workflow (in .tex buffers):
+- SPC m v: View PDF in Skim (forward search to current line).
+- SPC m c: Compile document.
+- SPC m a: Run all commands (save, compile, view).
+- Save file: Auto-compiles PDF via latexmk.
+- Cmd+Shift+Click in Skim: Inverse search (jumps to source line in Emacs).
 
 Insert mode:
 - C-[: Exit insert mode to normal mode (evil-normal-state).

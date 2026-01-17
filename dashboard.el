@@ -264,13 +264,18 @@ Returns list of (heading deadline-str status)."
 ;; INTERACTIVE COMMANDS
 ;; ============================================================================
 
-(defun my/dashboard-refresh ()
-  "Refresh the dashboard (both panes)."
+(defun my/dashboard-refresh (&optional preserve-pos)
+  "Refresh the dashboard (both panes).
+If PRESERVE-POS is non-nil, keep cursor at current line."
   (interactive)
   ;; Refresh the habits/todos pane
   (when (get-buffer my/dashboard-buffer-name)
     (with-current-buffer my/dashboard-buffer-name
-      (my/dashboard-render-right-pane)))
+      (let ((line (line-number-at-pos)))
+        (my/dashboard-render-right-pane t)
+        (when preserve-pos
+          (goto-char (point-min))
+          (forward-line (1- line))))))
   ;; Refresh org-agenda if open
   (when (get-buffer "*Org Agenda*")
     (with-current-buffer "*Org Agenda*"
@@ -287,7 +292,7 @@ Returns list of (heading deadline-str status)."
        (let ((name (plist-get item-data :name))
              (type (plist-get item-data :type)))
          (my/habit-cycle-state name type)
-         (my/dashboard-refresh)))
+         (my/dashboard-refresh t)))
       ('todo
        (message "Todo: %s" (car item-data)))
       ('deadline
@@ -302,7 +307,7 @@ Returns list of (heading deadline-str status)."
       (let ((name (plist-get item-data :name))
             (type (plist-get item-data :type)))
         (my/habit-set-state name type state)
-        (my/dashboard-refresh)))))
+        (my/dashboard-refresh t)))))
 
 (defun my/dashboard-mark-completed ()
   "Mark habit at point as completed."
@@ -358,8 +363,9 @@ Left: org-agenda week view, Right: habits and todos."
     (other-window 1)
     (switch-to-buffer dash-buf)))
 
-(defun my/dashboard-render-right-pane ()
-  "Render the right pane (deadlines + habits + todos)."
+(defun my/dashboard-render-right-pane (&optional skip-goto)
+  "Render the right pane (deadlines + habits + todos).
+If SKIP-GOTO is non-nil, don't move cursor to top."
   (let ((inhibit-read-only t))
     (erase-buffer)
 
@@ -391,7 +397,8 @@ Left: org-agenda week view, Right: habits and todos."
     (insert (propertize "Todos:  " 'face 'font-lock-comment-face))
     (insert (propertize "SPC o c=capture SPC o t=todo.org\n" 'face 'font-lock-comment-face))
 
-    (goto-char (point-min))))
+    (unless skip-goto
+      (goto-char (point-min)))))
 
 (provide 'dashboard)
 ;;; dashboard.el ends here
