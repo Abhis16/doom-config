@@ -11,3 +11,9 @@ auth-source-pass/
 # AI assistant context files
 AGENTS.md
 CLAUDE.md
+
+# Habit logs (local data)
+/habit-log/
+
+# macOS
+.DS_Store

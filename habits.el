@@ -810,7 +810,7 @@ Called before Emacs exits."
 
 (defun my/habit-load-session-states ()
   "Load session states from file if valid.
-Only loads if the saved states are for the current day/week."
+Logs stale states before reinitializing for new day/week."
   (when (file-exists-p my/habit-session-file)
     (let ((today (my/habit-today-string))
           (week-start (my/habit-current-week-start-string)))
@@ -825,18 +825,35 @@ Only loads if the saved states are for the current day/week."
        ;; Daily is stale, weekly is current
        ((and (not (string= my/habit-current-daily-date today))
              (string= my/habit-current-week-start week-start))
+        ;; Log the stale daily states before reinitializing
+        (when my/habit-current-daily-date
+          (my/habit-write-daily-log my/habit-current-daily-date
+                                    my/habit-daily-states "auto"))
         (my/habit-init-daily-states)
-        (message "Daily habit states reinitialized (new day). Weekly states restored."))
+        (message "Daily habits logged and reinitialized. Weekly states restored."))
        ;; Daily is current, weekly is stale
        ((and (string= my/habit-current-daily-date today)
              (not (string= my/habit-current-week-start week-start)))
+        ;; Log the stale weekly states before reinitializing
+        (when my/habit-current-week-start
+          (my/habit-write-weekly-log my/habit-current-week-start
+                                     (my/habit-get-week-end my/habit-current-week-start)
+                                     my/habit-weekly-states "auto"))
         (my/habit-init-weekly-states)
-        (message "Daily states restored. Weekly habit states reinitialized (new week)."))
+        (message "Daily states restored. Weekly habits logged and reinitialized."))
        ;; Both stale
        (t
+        ;; Log both stale states before reinitializing
+        (when my/habit-current-daily-date
+          (my/habit-write-daily-log my/habit-current-daily-date
+                                    my/habit-daily-states "auto"))
+        (when my/habit-current-week-start
+          (my/habit-write-weekly-log my/habit-current-week-start
+                                     (my/habit-get-week-end my/habit-current-week-start)
+                                     my/habit-weekly-states "auto"))
         (my/habit-init-daily-states)
         (my/habit-init-weekly-states)
-        (message "Habit states reinitialized (new day and week).")))
+        (message "Habit states logged and reinitialized (new day and week).")))
       ;; Delete session file after loading
       (delete-file my/habit-session-file))))
 

@@ -144,6 +144,11 @@
         :desc "Current week" "c" #'my/journal-open-current-week
         :desc "Read week" "r" #'my/journal-read-week
         :desc "List weeks" "l" #'my/journal-list-weeks)
+       (:prefix ("e" . "essays")
+        :desc "New essay" "e" #'my/essays-new
+        :desc "New essay" "n" #'my/essays-new
+        :desc "List essays" "l" #'my/essays-list
+        :desc "Open folder" "o" #'my/essays-open-directory)
        :desc "Papers file" "p"
        (cmd! (find-file (expand-file-name "research/papers.org" org-directory)))
        ;; Quick access to custom agenda views
@@ -273,8 +278,8 @@
 ;; LATEX CONFIGURATION
 ;; ============================================================================
 
-;; Use Skim for PDF viewing (has SyncTeX support)
-(setq +latex-viewers '(skim))
+;; Use pdf-tools for PDF viewing (integrated in Emacs with SyncTeX support)
+(setq +latex-viewers '(pdf-tools))
 
 ;; Set master file to the current file by default (avoids nil errors)
 (setq-default TeX-master t)
@@ -283,17 +288,26 @@
   ;; Default to latexmk
   (setq TeX-command-default "LatexMk")
 
-  ;; Auto-compile on save (runs latexmk directly)
+  ;; Use AUCTeX's built-in async compilation instead of raw compile
+  ;; This integrates properly with pdf-tools and avoids race conditions
+  (setq TeX-save-query nil)  ; Don't prompt to save before compiling
   (add-hook 'LaTeX-mode-hook
             (lambda ()
               (add-hook 'after-save-hook
                         (lambda ()
-                          (let ((master (TeX-master-file)))
-                            (when master
-                              (save-window-excursion
-                                (compile (format "latexmk -pdf -synctex=1 %s"
-                                                (shell-quote-argument master)))))))
+                          (TeX-command-run-all nil))
                         nil t))))
+
+;; RefTeX configuration - point to your Zotero bibliography
+(setq reftex-default-bibliography '("~/gradschool/research/references.bib"))
+
+;; CDLatex: Rebind to avoid yasnippet TAB conflict
+(map! :map cdlatex-mode-map
+      :i "TAB" #'cdlatex-tab)
+
+;; LSP texlab settings
+(after! lsp-latex
+  (setq lsp-latex-build-on-save t))  ; Auto-build on save
 
 ;; ============================================================================
 ;; CITAR (ZOTERO) CONFIGURATION
@@ -301,7 +315,7 @@
 
 (use-package! citar
   :custom
-  (citar-bibliography '("~/org/references.bib"))
+  (citar-bibliography '("~/gradschool/research/references.bib"))
   (citar-library-paths '("~/Zotero/storage/"))
   (citar-notes-paths '("~/org/research/")))
 
@@ -400,6 +414,9 @@
 
 ;; Load quote of the day module
 (load! "quotes")
+
+;; Load the essays system
+(load! "essays")
 
 ;; Habit tracking keybindings under SPC o h
 (map! :leader
