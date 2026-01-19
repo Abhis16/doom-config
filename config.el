@@ -563,6 +563,172 @@
        :desc "Open writings dir" "o" (cmd! (find-file my/website-posts-dir))))
 
 ;; ============================================================================
+;; LATEX HOMEWORK PROJECT WORKFLOW
+;; ============================================================================
+
+(defvar my/gradschool-dir (expand-file-name "~/gradschool/"))
+(defvar my/hw-template-dir (expand-file-name "hw-template" my/gradschool-dir))
+
+(defun my/homework-list-semesters ()
+  "List semester directories in gradschool (folders matching fall/spring pattern)."
+  (let ((dirs '()))
+    (dolist (f (directory-files my/gradschool-dir t))
+      (when (and (file-directory-p f)
+                 (not (string-match-p "/\\." (file-name-nondirectory f)))
+                 (string-match-p "\\(fall\\|spring\\|summer\\|winter\\)[0-9]+" (file-name-nondirectory f)))
+        (push (file-name-nondirectory f) dirs)))
+    (sort dirs #'string<)))
+
+(defun my/homework-new ()
+  "Create a new homework project from template."
+  (interactive)
+  (let* ((name (read-string "Homework name (e.g., hw3): "))
+         (semester (completing-read "Semester: " (my/homework-list-semesters)))
+         (course (read-string "Course (e.g., cs500): "))
+         (course-dir (expand-file-name course (expand-file-name semester my/gradschool-dir)))
+         (dest-dir (expand-file-name name course-dir))
+         (hw-tex (expand-file-name "hw.tex" dest-dir))
+         (hw-cls (expand-file-name "abhi-hw.cls" dest-dir))
+         (gitignore (expand-file-name ".gitignore" dest-dir)))
+    (if (file-exists-p dest-dir)
+        (message "Directory %s already exists!" dest-dir)
+      (make-directory dest-dir t)  ; t creates parent dirs if needed
+      (copy-file (expand-file-name "hw.tex" my/hw-template-dir) hw-tex)
+      (copy-file (expand-file-name "abhi-hw.cls" my/hw-template-dir) hw-cls)
+      (copy-file (expand-file-name ".gitignore" my/hw-template-dir) gitignore)
+      (find-file hw-tex)
+      (message "Created homework project: %s" dest-dir))))
+
+;; ============================================================================
+;; LATEX WRITE-UP PROJECT WORKFLOW
+;; ============================================================================
+
+(defvar my/writeup-template-dir (expand-file-name "write-up-template" my/gradschool-dir))
+(defvar my/writeup-dest-dir (expand-file-name "research/write-ups" my/gradschool-dir))
+
+(defun my/writeup-new ()
+  "Create a new math write-up project from template."
+  (interactive)
+  (let* ((title (read-string "Write-up title: "))
+         (dest-dir (expand-file-name title my/writeup-dest-dir))
+         (main-tex (expand-file-name "main.tex" dest-dir))
+         (cls-file (expand-file-name "abhi-write-up-template.cls" dest-dir))
+         (bib-file (expand-file-name "references.bib" dest-dir))
+         (gitignore (expand-file-name ".gitignore" dest-dir)))
+    (if (file-exists-p dest-dir)
+        (message "Directory %s already exists!" dest-dir)
+      (make-directory dest-dir t)
+      (copy-file (expand-file-name "main.tex" my/writeup-template-dir) main-tex)
+      (copy-file (expand-file-name "abhi-write-up-template.cls" my/writeup-template-dir) cls-file)
+      (copy-file (expand-file-name "references.bib" my/writeup-template-dir) bib-file)
+      (copy-file (expand-file-name ".gitignore" my/writeup-template-dir) gitignore)
+      (find-file main-tex)
+      (message "Created write-up project: %s" dest-dir))))
+
+;; ============================================================================
+;; OVERLEAF INTEGRATION
+;; ============================================================================
+
+(defun my/overleaf-clean-url (input)
+  "Strip 'git clone ' prefix from INPUT if present."
+  (string-trim (replace-regexp-in-string "^git clone " "" input)))
+
+(defun my/overleaf-clone ()
+  "Clone an Overleaf project to the write-ups directory."
+  (interactive)
+  (let* ((url (my/overleaf-clean-url (read-string "Overleaf git URL: ")))
+         (name (read-string "Local folder name: "))
+         (dest-dir (expand-file-name name my/writeup-dest-dir)))
+    (if (file-exists-p dest-dir)
+        (message "Directory %s already exists!" dest-dir)
+      (let ((default-directory my/writeup-dest-dir))
+        (make-directory my/writeup-dest-dir t)
+        (if (zerop (call-process "git" nil nil nil "clone" url name))
+            (progn
+              (find-file (expand-file-name "main.tex" dest-dir))
+              (message "Cloned Overleaf project to: %s" dest-dir))
+          (message "Failed to clone. Check URL and credentials."))))))
+
+(defun my/overleaf-init ()
+  "Initialize current write-up as git repo and link to Overleaf.
+Run this from a buffer visiting a file in the write-up directory."
+  (interactive)
+  (let* ((file (buffer-file-name))
+         (dir (if file (file-name-directory file) default-directory))
+         (url (my/overleaf-clean-url (read-string "Overleaf git URL: "))))
+    (let ((default-directory dir))
+      ;; Initialize git if needed
+      (unless (file-exists-p (expand-file-name ".git" dir))
+        (call-process "git" nil nil nil "init"))
+      ;; Stage all files and create initial commit
+      (call-process "git" nil nil nil "add" "-A")
+      (call-process "git" nil nil nil "commit" "-m" "Initial commit" "--allow-empty")
+      ;; Rename branch to master AFTER first commit (Overleaf uses master)
+      (call-process "git" nil nil nil "branch" "-M" "master")
+      ;; Add overleaf remote (or update if exists)
+      (call-process "git" nil nil nil "remote" "remove" "overleaf")
+      (call-process "git" nil nil nil "remote" "add" "overleaf" url)
+      ;; Pull from Overleaf to merge any existing content
+      (call-process "git" nil nil nil "pull" "overleaf" "master" "--allow-unrelated-histories" "--no-edit")
+      (message "Linked to Overleaf and synced. Use SPC o L s to commit and push."))))
+
+(defun my/overleaf-commit ()
+  "Commit all changes in the current write-up."
+  (interactive)
+  (let ((default-directory (if (buffer-file-name)
+                               (file-name-directory (buffer-file-name))
+                             default-directory))
+        (msg (read-string "Commit message: " "Update write-up")))
+    (save-buffer)
+    (call-process "git" nil nil nil "add" "-A")
+    (if (zerop (call-process "git" nil nil nil "commit" "-m" msg))
+        (message "Committed: %s" msg)
+      (message "Nothing to commit or commit failed."))))
+
+(defun my/overleaf-push ()
+  "Push current write-up to Overleaf remote."
+  (interactive)
+  (let ((default-directory (if (buffer-file-name)
+                               (file-name-directory (buffer-file-name))
+                             default-directory)))
+    (async-shell-command "git push -u overleaf master" "*Overleaf Push*")))
+
+(defun my/overleaf-pull ()
+  "Pull changes from Overleaf remote."
+  (interactive)
+  (let ((default-directory (if (buffer-file-name)
+                               (file-name-directory (buffer-file-name))
+                             default-directory)))
+    (shell-command "git pull overleaf master --allow-unrelated-histories")
+    (revert-buffer t t)
+    (message "Pulled from Overleaf and refreshed buffer.")))
+
+(defun my/overleaf-sync ()
+  "Commit all changes and push to Overleaf."
+  (interactive)
+  (let ((default-directory (if (buffer-file-name)
+                               (file-name-directory (buffer-file-name))
+                             default-directory))
+        (msg (read-string "Commit message: " "Update write-up")))
+    (save-buffer)
+    (call-process "git" nil nil nil "add" "-A")
+    (call-process "git" nil nil nil "commit" "-m" msg)
+    (async-shell-command "git push -u overleaf master" "*Overleaf Push*")))
+
+;; Homework, write-up, and Overleaf keybindings
+(map! :leader
+      (:prefix ("o" . "org")
+       :desc "New homework project" "H" #'my/homework-new
+       :desc "New math write-up" "W" #'my/writeup-new
+       (:prefix ("L" . "overleaf")
+        :desc "Clone from Overleaf" "c" #'my/overleaf-clone
+        :desc "Init/link to Overleaf" "i" #'my/overleaf-init
+        :desc "Commit changes" "k" #'my/overleaf-commit
+        :desc "Sync (commit + push)" "s" #'my/overleaf-sync
+        :desc "Push to Overleaf" "p" #'my/overleaf-push
+        :desc "Pull from Overleaf" "l" #'my/overleaf-pull)))
+
+;; ============================================================================
 ;; BUFFER BEHAVIOR
 ;; ============================================================================
 

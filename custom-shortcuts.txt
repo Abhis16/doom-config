@@ -69,6 +69,40 @@ Website workflow (SPC W - capital W):
 - SPC W b: Build site (zola build).
 - SPC W o: Open writings directory.
 
+Homework project (SPC o H):
+- SPC o H: Create new homework project from template.
+  Prompts for: homework name, semester, course.
+  Creates directory at ~/gradschool/{semester}/{course}/{name}/
+  Copies hw.tex, abhi-hw.cls, and .gitignore from template, opens hw.tex.
+  Use SPC o L i to link to Overleaf for collaboration.
+
+Math write-up project (SPC o W):
+- SPC o W: Create new math write-up project from template.
+  Prompts for: write-up title.
+  Creates directory at ~/gradschool/research/write-ups/{title}/
+  Copies main.tex, abhi-write-up-template.cls, references.bib, and .gitignore.
+  Opens main.tex.
+
+Overleaf integration (SPC o L):
+- SPC o L c: Clone Overleaf project locally.
+  Prompts for: Overleaf git URL, local folder name.
+  Clones to ~/gradschool/research/write-ups/{name}/, opens main.tex.
+- SPC o L i: Link current write-up to Overleaf.
+  Prompts for: Overleaf git URL.
+  Initializes git, commits, links remote, and pulls from Overleaf.
+- SPC o L k: Commit changes (stages all, prompts for message).
+- SPC o L s: Sync - commit and push to Overleaf in one step.
+- SPC o L p: Push to Overleaf (without committing first).
+- SPC o L l: Pull changes from Overleaf.
+
+Typical Overleaf workflows:
+1. Work on existing Overleaf project locally:
+   - SPC o L c → enter URL → enter name → edit → SPC o L s to sync
+2. Create local write-up and sync to Overleaf:
+   - SPC o W → create project → on Overleaf, create blank project
+   - SPC o L i → enter Overleaf URL (auto-syncs)
+   - Edit locally → SPC o L s to sync changes
+
 LaTeX workflow (in .tex buffers):
 - SPC m v: View PDF in pdf-tools (integrated Emacs viewer).
 - SPC m c: Compile document.
